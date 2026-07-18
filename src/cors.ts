@@ -2,9 +2,6 @@ import type { Env } from './types';
 
 export const DEFAULT_ALLOWED_ORIGIN = 'https://hub.yamanashi.dev';
 
-// ワイルドカードや複数オリジン(カンマ/空白区切り)は許可しない。
-// `new URL(value).origin === value` の比較により、パス・クエリ・末尾スラッシュ等が
-// 付与された値やワイルドカードも弾かれる。
 function isSingleValidOrigin(value: string): boolean {
   if (value === '*' || /[\s,]/.test(value)) {
     return false;
@@ -34,8 +31,6 @@ function resolveConfiguredOrigin(value: string | undefined, varName: string): st
   return undefined;
 }
 
-// 許可オリジンの一覧を返す。先頭が既定の許可オリジン(通常は本番オリジン)、
-// 2番目以降は EXTRA_ALLOWED_ORIGIN 等、リポジトリに公開しない追加オリジン。
 export function getAllowedOrigins(env: Env): string[] {
   const primary = resolveConfiguredOrigin(env.ALLOWED_ORIGIN, 'ALLOWED_ORIGIN') ?? DEFAULT_ALLOWED_ORIGIN;
   const extra = resolveConfiguredOrigin(env.EXTRA_ALLOWED_ORIGIN, 'EXTRA_ALLOWED_ORIGIN');

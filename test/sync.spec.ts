@@ -33,7 +33,6 @@ describe('POST /sync', () => {
     const getBody = await getResponse.json();
     expect(getBody).toEqual(payload);
 
-    // 一度きりの取得: 再取得は404になる
     const secondGetResponse = await getSync(postBody.code);
     expect(secondGetResponse.status).toBe(404);
   });

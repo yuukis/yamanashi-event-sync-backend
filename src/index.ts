@@ -5,8 +5,6 @@ import type { Env } from './types';
 
 const CODE_PATTERN = new RegExp(`^[${CODE_CHARSET}]{${CODE_LENGTH}}$`);
 
-// 発行コード・同期データはいずれも一度きり利用が前提のため、
-// 中間キャッシュ等に残らないよう明示的にキャッシュを禁止する。
 function responseHeaders(request: Request, env: Env): Record<string, string> {
   return {
     'Content-Type': 'application/json',
@@ -65,7 +63,6 @@ async function handleGetSync(request: Request, rawCode: string, env: Env): Promi
     return jsonResponse(request, { error: 'Not Found' }, 404, env);
   }
 
-  // 一度きりの取得: 返却後は即座に削除する。
   // delete失敗時もクライアントは取得自体には成功しているため、
   // ログにのみ残しレスポンスは通常通り返す(取得可否の一貫性を優先)。
   try {
