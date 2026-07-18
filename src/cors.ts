@@ -2,9 +2,6 @@ import type { Env } from './types';
 
 export const DEFAULT_ALLOWED_ORIGIN = 'https://hub.yamanashi.dev';
 
-// ワイルドカードや複数オリジン(カンマ/空白区切り)は許可しない。
-// `new URL(value).origin === value` の比較により、パス・クエリ・末尾スラッシュ等が
-// 付与された値やワイルドカードも弾かれる。
 function isSingleValidOrigin(value: string): boolean {
   if (value === '*' || /[\s,]/.test(value)) {
     return false;
@@ -18,24 +15,42 @@ function isSingleValidOrigin(value: string): boolean {
   }
 }
 
-export function getAllowedOrigin(env: Env): string {
-  const configured = env.ALLOWED_ORIGIN?.trim();
-
-  if (configured && configured.length > 0) {
-    if (isSingleValidOrigin(configured)) {
-      return configured;
-    }
-    console.warn(
-      `Invalid ALLOWED_ORIGIN "${configured}": must be a single http(s) origin with no path, query, wildcard, or additional origins. Falling back to default.`
-    );
+function resolveConfiguredOrigin(
+  value: string | undefined,
+  varName: string,
+  options: { sensitive?: boolean } = {}
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
   }
 
-  return DEFAULT_ALLOWED_ORIGIN;
+  if (isSingleValidOrigin(trimmed)) {
+    return trimmed;
+  }
+
+  const detail = options.sensitive ? '(value redacted)' : `"${trimmed}"`;
+  console.warn(
+    `Invalid ${varName} ${detail}: must be a single http(s) origin with no path, query, wildcard, or additional origins. Ignoring.`
+  );
+  return undefined;
 }
 
-export function corsHeaders(env: Env): Record<string, string> {
+export function getAllowedOrigins(env: Env): string[] {
+  const primary = resolveConfiguredOrigin(env.ALLOWED_ORIGIN, 'ALLOWED_ORIGIN') ?? DEFAULT_ALLOWED_ORIGIN;
+  const extra = resolveConfiguredOrigin(env.EXTRA_ALLOWED_ORIGIN, 'EXTRA_ALLOWED_ORIGIN', { sensitive: true });
+
+  return extra && extra !== primary ? [primary, extra] : [primary];
+}
+
+export function corsHeaders(request: Request, env: Env): Record<string, string> {
+  const allowedOrigins = getAllowedOrigins(env);
+  const primaryOrigin = allowedOrigins[0] ?? DEFAULT_ALLOWED_ORIGIN;
+  const requestOrigin = request.headers.get('Origin');
+  const allowOrigin = requestOrigin && allowedOrigins.includes(requestOrigin) ? requestOrigin : primaryOrigin;
+
   return {
-    'Access-Control-Allow-Origin': getAllowedOrigin(env),
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Vary': 'Origin',

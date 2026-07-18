@@ -84,8 +84,21 @@ Replace the `id` / `preview_id` values in the `[[kv_namespaces]]` section of `wr
 
 ## Environment variables
 
-| Variable         | Description                                                                        | Default                     |
-| ----------------- | ----------------------------------------------------------------------------------- | ---------------------------- |
-| `ALLOWED_ORIGIN` | CORS-allowed origin (a single origin only; wildcards are not supported)             | `https://hub.yamanashi.dev` |
+| Variable               | Description                                                                    | Default                     |
+| ----------------------- | -------------------------------------------------------------------------------- | ---------------------------- |
+| `ALLOWED_ORIGIN`       | CORS-allowed origin (a single origin only; wildcards are not supported)          | `https://hub.yamanashi.dev` |
+| `EXTRA_ALLOWED_ORIGIN` | An additional CORS-allowed origin (also a single origin; optional)               | _(none)_                     |
 
-This can be overridden in the `[vars]` section of `wrangler.toml`, or per-environment when running `wrangler deploy`. To prevent abuse of this service for relaying data from arbitrary origins, wildcards (`*`) are intentionally unsupported — always configure a single, specific origin.
+`ALLOWED_ORIGIN` is set in the `[vars]` section of `wrangler.toml` and is public (visible in this repository). To prevent abuse of this service for relaying data from arbitrary origins, wildcards (`*`) and multiple origins in one variable are intentionally unsupported — each variable holds exactly one origin.
+
+`EXTRA_ALLOWED_ORIGIN` is meant for an origin you don't want to expose in the repo (e.g. an internal dev environment hostname). Set it as a Cloudflare **secret** instead of a `[vars]` entry, so it's never committed:
+
+```bash
+npx wrangler secret put EXTRA_ALLOWED_ORIGIN
+```
+
+For local development, put it in a `.dev.vars` file (already gitignored) instead:
+
+```
+EXTRA_ALLOWED_ORIGIN=https://your-dev-host.example.com
+```
