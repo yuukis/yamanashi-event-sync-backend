@@ -15,7 +15,11 @@ function isSingleValidOrigin(value: string): boolean {
   }
 }
 
-function resolveConfiguredOrigin(value: string | undefined, varName: string): string | undefined {
+function resolveConfiguredOrigin(
+  value: string | undefined,
+  varName: string,
+  options: { sensitive?: boolean } = {}
+): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) {
     return undefined;
@@ -25,15 +29,18 @@ function resolveConfiguredOrigin(value: string | undefined, varName: string): st
     return trimmed;
   }
 
+  // EXTRA_ALLOWED_ORIGIN はリポジトリに公開しない前提の値のため、
+  // 不正値であってもログに生の値を残さない。
+  const detail = options.sensitive ? '(value redacted)' : `"${trimmed}"`;
   console.warn(
-    `Invalid ${varName} "${trimmed}": must be a single http(s) origin with no path, query, wildcard, or additional origins. Ignoring.`
+    `Invalid ${varName} ${detail}: must be a single http(s) origin with no path, query, wildcard, or additional origins. Ignoring.`
   );
   return undefined;
 }
 
 export function getAllowedOrigins(env: Env): string[] {
   const primary = resolveConfiguredOrigin(env.ALLOWED_ORIGIN, 'ALLOWED_ORIGIN') ?? DEFAULT_ALLOWED_ORIGIN;
-  const extra = resolveConfiguredOrigin(env.EXTRA_ALLOWED_ORIGIN, 'EXTRA_ALLOWED_ORIGIN');
+  const extra = resolveConfiguredOrigin(env.EXTRA_ALLOWED_ORIGIN, 'EXTRA_ALLOWED_ORIGIN', { sensitive: true });
 
   return extra && extra !== primary ? [primary, extra] : [primary];
 }
