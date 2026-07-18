@@ -29,8 +29,6 @@ function resolveConfiguredOrigin(
     return trimmed;
   }
 
-  // EXTRA_ALLOWED_ORIGIN はリポジトリに公開しない前提の値のため、
-  // 不正値であってもログに生の値を残さない。
   const detail = options.sensitive ? '(value redacted)' : `"${trimmed}"`;
   console.warn(
     `Invalid ${varName} ${detail}: must be a single http(s) origin with no path, query, wildcard, or additional origins. Ignoring.`
