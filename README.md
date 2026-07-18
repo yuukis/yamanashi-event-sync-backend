@@ -1,89 +1,89 @@
 # yamanashi-event-sync-backend
 
-[yamanashi-event-frontend](https://github.com/yuukis/yamanashi-event-frontend) の複数端末間同期機能([frontend#60](https://github.com/yuukis/yamanashi-event-frontend/issues/60))が利用する、短命な一時中継サーバーです。
+A short-lived relay server used by the [yamanashi-event-frontend](https://github.com/yuukis/yamanashi-event-frontend) multi-device sync feature ([frontend#60](https://github.com/yuukis/yamanashi-event-frontend/issues/60)).
 
-Cloudflare Workers + Workers KV で実装されています。発行された6桁のコードを別端末で読み取ると、元のデータ(参加予定マークのUID一覧など)が取得できます。データはKVに10分間だけ保存され、一度取得されると即座に削除されます。認証やアカウント機能は持たない、匿名・一時利用のみのサービスです。
+Built on Cloudflare Workers + Workers KV. Data (such as a list of "planning to attend" event UIDs) is registered and issued a 6-digit code, which can then be read on another device to retrieve the original data. Data is stored in KV for 10 minutes only and is deleted immediately once retrieved. This service has no authentication or account features — it is for anonymous, one-time use only.
 
 ## API
 
 ### `POST /sync`
 
-データを登録し、6桁のコードを発行します。
+Registers data and issues a 6-digit code.
 
-リクエストボディ(JSON、上限100KB):
+Request body (JSON, 100KB limit):
 
 ```json
 { "version": 1, "uids": ["event_383282@connpass.com", "event_384783@connpass.com"] }
 ```
 
-- `uids` は空でない文字列配列である必要があります
-- `version` は `1` 固定です
+- `uids` must be a non-empty array of strings
+- `version` must be `1`
 
-レスポンス(200):
+Response (200):
 
 ```json
 { "code": "A3K9P2", "expires_at": "2026-07-18T12:10:00+09:00" }
 ```
 
-エラー:
+Errors:
 
-- `400` — リクエストボディが不正(JSONとして不正、`version` 不一致、`uids` が空または不正)
-- `413` — ペイロードが100KBを超過
+- `400` — invalid request body (malformed JSON, `version` mismatch, empty or invalid `uids`)
+- `413` — payload exceeds 100KB
 
 ### `GET /sync/:code`
 
-コードに対応するデータを取得します。`code` は大文字小文字を区別しません。
+Retrieves the data associated with a code. `code` is case-insensitive.
 
-- 取得に成功すると、そのコードのデータはKVから即座に削除されます(一度きりの取得)
-- 存在しない・期限切れ・取得済みのコードを指定した場合は `404` を返します
+- On a successful retrieval, the data for that code is immediately deleted from KV (one-time retrieval)
+- Returns `404` if the code does not exist, has expired, or was already retrieved
 
-レスポンス(200):
+Response (200):
 
 ```json
 { "version": 1, "uids": ["event_383282@connpass.com", "event_384783@connpass.com"] }
 ```
 
-## ローカル開発
+## Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-`wrangler dev` がローカルでWorkerを起動します(ローカルKVを自動的に使用します)。
+`wrangler dev` starts the Worker locally (using a local KV store automatically).
 
-### テスト
+### Tests
 
 ```bash
 npm test
 ```
 
-`vitest` + `@cloudflare/vitest-pool-workers` により、Workersランタイム上でテストを実行します。
+Runs tests inside the Workers runtime via `vitest` + `@cloudflare/vitest-pool-workers`.
 
-### 型チェック
+### Type checking
 
 ```bash
 npm run typecheck
 ```
 
-## デプロイ
+## Deployment
 
 ```bash
 npx wrangler login
 
-# 初回のみ: KV Namespaceを作成し、出力されたIDを wrangler.toml に設定する
+# First time only: create the KV namespace and set the resulting IDs in wrangler.toml
 npx wrangler kv namespace create SYNC_KV
 npx wrangler kv namespace create SYNC_KV --preview
 
 npm run deploy
 ```
 
-`wrangler.toml` の `[[kv_namespaces]]` セクションにある `id` / `preview_id` を、上記コマンドで作成したNamespaceのIDに置き換えてください。
+Replace the `id` / `preview_id` values in the `[[kv_namespaces]]` section of `wrangler.toml` with the namespace IDs created by the commands above.
 
-## 環境変数
+## Environment variables
 
-| 変数名           | 説明                                                                 | デフォルト値                  |
-| ---------------- | ---------------------------------------------------------------------- | ------------------------------ |
-| `ALLOWED_ORIGIN` | CORSで許可するオリジン(単一のオリジンのみ指定可能。ワイルドカード不可) | `https://hub.yamanashi.dev` |
+| Variable         | Description                                                                        | Default                     |
+| ----------------- | ----------------------------------------------------------------------------------- | ---------------------------- |
+| `ALLOWED_ORIGIN` | CORS-allowed origin (a single origin only; wildcards are not supported)             | `https://hub.yamanashi.dev` |
 
-`wrangler.toml` の `[vars]` セクション、または `wrangler deploy` 時の環境ごとの設定で上書きできます。任意のオリジンからのデータ中継を防ぐため、ワイルドカード(`*`)は指定できない運用とし、必ず単一のオリジンを設定してください。
+This can be overridden in the `[vars]` section of `wrangler.toml`, or per-environment when running `wrangler deploy`. To prevent abuse of this service for relaying data from arbitrary origins, wildcards (`*`) are intentionally unsupported — always configure a single, specific origin.
