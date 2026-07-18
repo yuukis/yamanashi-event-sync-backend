@@ -5,13 +5,20 @@ import type { Env } from './types';
 
 const CODE_PATTERN = new RegExp(`^[${CODE_CHARSET}]{${CODE_LENGTH}}$`);
 
+// 発行コード・同期データはいずれも一度きり利用が前提のため、
+// 中間キャッシュ等に残らないよう明示的にキャッシュを禁止する。
+function responseHeaders(env: Env): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+    ...corsHeaders(env),
+  };
+}
+
 function jsonResponse(body: unknown, status: number, env: Env): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      'Content-Type': 'application/json',
-      ...corsHeaders(env),
-    },
+    headers: responseHeaders(env),
   });
 }
 
@@ -49,12 +56,12 @@ async function handleGetSync(rawCode: string, env: Env): Promise<Response> {
   const code = rawCode.toUpperCase();
 
   if (!CODE_PATTERN.test(code)) {
-    return jsonResponse({ error: 'Not found' }, 404, env);
+    return jsonResponse({ error: 'Not Found' }, 404, env);
   }
 
   const value = await env.SYNC_KV.get(code);
   if (value === null) {
-    return jsonResponse({ error: 'Not found' }, 404, env);
+    return jsonResponse({ error: 'Not Found' }, 404, env);
   }
 
   // 一度きりの取得: 返却後は即座に削除する
@@ -62,10 +69,7 @@ async function handleGetSync(rawCode: string, env: Env): Promise<Response> {
 
   return new Response(value, {
     status: 200,
-    headers: {
-      'Content-Type': 'application/json',
-      ...corsHeaders(env),
-    },
+    headers: responseHeaders(env),
   });
 }
 
@@ -90,7 +94,7 @@ export default {
     if (request.method === 'GET' && getSyncMatch) {
       const code = getSyncMatch[1];
       if (code === undefined) {
-        return jsonResponse({ error: 'Not found' }, 404, env);
+        return jsonResponse({ error: 'Not Found' }, 404, env);
       }
       try {
         return await handleGetSync(code, env);
