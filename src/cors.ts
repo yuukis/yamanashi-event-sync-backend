@@ -26,7 +26,7 @@ export function getAllowedOrigin(env: Env): string {
       return configured;
     }
     console.warn(
-      `Invalid ALLOWED_ORIGIN "${configured}": wildcards and multiple origins are not supported. Falling back to default.`
+      `Invalid ALLOWED_ORIGIN "${configured}": must be a single http(s) origin with no path, query, wildcard, or additional origins. Falling back to default.`
     );
   }
 
