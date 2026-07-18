@@ -1,5 +1,5 @@
-import { SELF } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { env, SELF } from 'cloudflare:test';
+import { describe, expect, it, vi } from 'vitest';
 
 const ORIGIN = 'http://localhost';
 
@@ -97,6 +97,20 @@ describe('GET /sync/:code', () => {
   it('コード形式が不正な場合は404になる', async () => {
     const response = await getSync('!!!');
     expect(response.status).toBe(404);
+  });
+
+  it('KVのdelete失敗時もデータ自体は200で返す', async () => {
+    const payload = { version: 1, uids: ['event_1@connpass.com'] };
+    const postResponse = await postSync(payload);
+    const { code } = await postResponse.json<{ code: string }>();
+
+    const deleteSpy = vi.spyOn(env.SYNC_KV, 'delete').mockRejectedValueOnce(new Error('KV unavailable'));
+
+    const getResponse = await getSync(code);
+    expect(getResponse.status).toBe(200);
+    expect(await getResponse.json()).toEqual(payload);
+
+    deleteSpy.mockRestore();
   });
 
   it('404レスポンスのエラーメッセージ表記が統一されている', async () => {

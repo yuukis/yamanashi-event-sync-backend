@@ -65,8 +65,14 @@ async function handleGetSync(rawCode: string, env: Env): Promise<Response> {
     return jsonResponse({ error: 'Not Found' }, 404, env);
   }
 
-  // 一度きりの取得: 返却後は即座に削除する
-  await env.SYNC_KV.delete(code);
+  // 一度きりの取得: 返却後は即座に削除する。
+  // delete失敗時もクライアントは取得自体には成功しているため、
+  // ログにのみ残しレスポンスは通常通り返す(取得可否の一貫性を優先)。
+  try {
+    await env.SYNC_KV.delete(code);
+  } catch (err) {
+    console.error('Failed to delete sync code after retrieval', err);
+  }
 
   return new Response(value, {
     status: 200,
