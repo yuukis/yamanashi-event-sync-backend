@@ -28,10 +28,11 @@ async function handlePostSync(request: Request, env: Env): Promise<Response> {
     return jsonResponse({ error: 'Payload too large' }, 413, env);
   }
 
-  const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).length > MAX_PAYLOAD_BYTES) {
+  const bodyBuffer = await request.arrayBuffer();
+  if (bodyBuffer.byteLength > MAX_PAYLOAD_BYTES) {
     return jsonResponse({ error: 'Payload too large' }, 413, env);
   }
+  const rawBody = new TextDecoder().decode(bodyBuffer);
 
   let payload: unknown;
   try {
