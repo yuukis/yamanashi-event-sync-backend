@@ -29,12 +29,18 @@ describe('POST /sync', () => {
 
     const getResponse = await getSync(postBody.code);
     expect(getResponse.status).toBe(200);
+    expect(getResponse.headers.get('Cache-Control')).toBe('no-store');
     const getBody = await getResponse.json();
     expect(getBody).toEqual(payload);
 
     // 一度きりの取得: 再取得は404になる
     const secondGetResponse = await getSync(postBody.code);
     expect(secondGetResponse.status).toBe(404);
+  });
+
+  it('レスポンスにCache-Control: no-storeが設定される', async () => {
+    const response = await postSync({ version: 1, uids: ['event_1@connpass.com'] });
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('小文字のコードでも取得できる(大文字小文字を区別しない)', async () => {
@@ -91,6 +97,20 @@ describe('GET /sync/:code', () => {
   it('コード形式が不正な場合は404になる', async () => {
     const response = await getSync('!!!');
     expect(response.status).toBe(404);
+  });
+
+  it('404レスポンスのエラーメッセージ表記が統一されている', async () => {
+    const notExistResponse = await getSync('ZZZZZZ');
+    const invalidFormatResponse = await getSync('!!!');
+    const unknownRouteResponse = await SELF.fetch(`${ORIGIN}/unknown`, { method: 'GET' });
+
+    const bodies = await Promise.all(
+      [notExistResponse, invalidFormatResponse, unknownRouteResponse].map((res) => res.json<{ error: string }>())
+    );
+
+    for (const body of bodies) {
+      expect(body.error).toBe('Not Found');
+    }
   });
 });
 
