@@ -2,7 +2,9 @@
 
 A short-lived relay server used by the [yamanashi-event-frontend](https://github.com/yuukis/yamanashi-event-frontend) multi-device sync feature ([frontend#60](https://github.com/yuukis/yamanashi-event-frontend/issues/60)).
 
-Built on Cloudflare Workers + Workers KV. Data (such as a list of "planning to attend" event UIDs) is registered and issued a 6-digit code, which can then be read on another device to retrieve the original data. Data is stored in KV for 10 minutes only and is deleted immediately once retrieved. This service has no authentication or account features — it is for anonymous, one-time use only.
+Built on Cloudflare Workers + Workers KV. Data (such as a list of "planning to attend" event UIDs) is registered and issued a 6-digit code, which can then be read on another device to retrieve the original data. Data is stored in KV for 10 minutes only and is deleted once retrieved. This service has no authentication or account features — it is for anonymous, one-time use only.
+
+Note: retrieval is best-effort one-time due to Workers KV's eventually-consistent nature; a duplicate read from another PoP shortly after the first is theoretically possible.
 
 ## API
 
