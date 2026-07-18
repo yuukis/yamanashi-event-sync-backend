@@ -18,24 +18,39 @@ function isSingleValidOrigin(value: string): boolean {
   }
 }
 
-export function getAllowedOrigin(env: Env): string {
-  const configured = env.ALLOWED_ORIGIN?.trim();
-
-  if (configured && configured.length > 0) {
-    if (isSingleValidOrigin(configured)) {
-      return configured;
-    }
-    console.warn(
-      `Invalid ALLOWED_ORIGIN "${configured}": must be a single http(s) origin with no path, query, wildcard, or additional origins. Falling back to default.`
-    );
+function resolveConfiguredOrigin(value: string | undefined, varName: string): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
   }
 
-  return DEFAULT_ALLOWED_ORIGIN;
+  if (isSingleValidOrigin(trimmed)) {
+    return trimmed;
+  }
+
+  console.warn(
+    `Invalid ${varName} "${trimmed}": must be a single http(s) origin with no path, query, wildcard, or additional origins. Ignoring.`
+  );
+  return undefined;
 }
 
-export function corsHeaders(env: Env): Record<string, string> {
+// 許可オリジンの一覧を返す。先頭が既定の許可オリジン(通常は本番オリジン)、
+// 2番目以降は EXTRA_ALLOWED_ORIGIN 等、リポジトリに公開しない追加オリジン。
+export function getAllowedOrigins(env: Env): string[] {
+  const primary = resolveConfiguredOrigin(env.ALLOWED_ORIGIN, 'ALLOWED_ORIGIN') ?? DEFAULT_ALLOWED_ORIGIN;
+  const extra = resolveConfiguredOrigin(env.EXTRA_ALLOWED_ORIGIN, 'EXTRA_ALLOWED_ORIGIN');
+
+  return extra && extra !== primary ? [primary, extra] : [primary];
+}
+
+export function corsHeaders(request: Request, env: Env): Record<string, string> {
+  const allowedOrigins = getAllowedOrigins(env);
+  const primaryOrigin = allowedOrigins[0] ?? DEFAULT_ALLOWED_ORIGIN;
+  const requestOrigin = request.headers.get('Origin');
+  const allowOrigin = requestOrigin && allowedOrigins.includes(requestOrigin) ? requestOrigin : primaryOrigin;
+
   return {
-    'Access-Control-Allow-Origin': getAllowedOrigin(env),
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Vary': 'Origin',

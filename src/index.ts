@@ -7,30 +7,30 @@ const CODE_PATTERN = new RegExp(`^[${CODE_CHARSET}]{${CODE_LENGTH}}$`);
 
 // 発行コード・同期データはいずれも一度きり利用が前提のため、
 // 中間キャッシュ等に残らないよう明示的にキャッシュを禁止する。
-function responseHeaders(env: Env): Record<string, string> {
+function responseHeaders(request: Request, env: Env): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-store',
-    ...corsHeaders(env),
+    ...corsHeaders(request, env),
   };
 }
 
-function jsonResponse(body: unknown, status: number, env: Env): Response {
+function jsonResponse(request: Request, body: unknown, status: number, env: Env): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: responseHeaders(env),
+    headers: responseHeaders(request, env),
   });
 }
 
 async function handlePostSync(request: Request, env: Env): Promise<Response> {
   const contentLength = request.headers.get('content-length');
   if (contentLength !== null && Number(contentLength) > MAX_PAYLOAD_BYTES) {
-    return jsonResponse({ error: 'Payload too large' }, 413, env);
+    return jsonResponse(request, { error: 'Payload too large' }, 413, env);
   }
 
   const bodyBuffer = await request.arrayBuffer();
   if (bodyBuffer.byteLength > MAX_PAYLOAD_BYTES) {
-    return jsonResponse({ error: 'Payload too large' }, 413, env);
+    return jsonResponse(request, { error: 'Payload too large' }, 413, env);
   }
   const rawBody = new TextDecoder().decode(bodyBuffer);
 
@@ -38,11 +38,11 @@ async function handlePostSync(request: Request, env: Env): Promise<Response> {
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    return jsonResponse({ error: 'Invalid JSON' }, 400, env);
+    return jsonResponse(request, { error: 'Invalid JSON' }, 400, env);
   }
 
   if (!isValidSyncPayload(payload)) {
-    return jsonResponse({ error: 'Invalid payload' }, 400, env);
+    return jsonResponse(request, { error: 'Invalid payload' }, 400, env);
   }
 
   const code = await generateUniqueCode(env.SYNC_KV);
@@ -50,19 +50,19 @@ async function handlePostSync(request: Request, env: Env): Promise<Response> {
 
   const expiresAt = formatExpiresAt(Date.now() + TTL_SECONDS * 1000);
 
-  return jsonResponse({ code, expires_at: expiresAt }, 200, env);
+  return jsonResponse(request, { code, expires_at: expiresAt }, 200, env);
 }
 
-async function handleGetSync(rawCode: string, env: Env): Promise<Response> {
+async function handleGetSync(request: Request, rawCode: string, env: Env): Promise<Response> {
   const code = rawCode.toUpperCase();
 
   if (!CODE_PATTERN.test(code)) {
-    return jsonResponse({ error: 'Not Found' }, 404, env);
+    return jsonResponse(request, { error: 'Not Found' }, 404, env);
   }
 
   const value = await env.SYNC_KV.get(code);
   if (value === null) {
-    return jsonResponse({ error: 'Not Found' }, 404, env);
+    return jsonResponse(request, { error: 'Not Found' }, 404, env);
   }
 
   // 一度きりの取得: 返却後は即座に削除する。
@@ -76,7 +76,7 @@ async function handleGetSync(rawCode: string, env: Env): Promise<Response> {
 
   return new Response(value, {
     status: 200,
-    headers: responseHeaders(env),
+    headers: responseHeaders(request, env),
   });
 }
 
@@ -85,7 +85,7 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders(env) });
+      return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
 
     if (request.method === 'POST' && url.pathname === '/sync') {
@@ -93,7 +93,7 @@ export default {
         return await handlePostSync(request, env);
       } catch (err) {
         console.error(err);
-        return jsonResponse({ error: 'Internal Server Error' }, 500, env);
+        return jsonResponse(request, { error: 'Internal Server Error' }, 500, env);
       }
     }
 
@@ -101,16 +101,16 @@ export default {
     if (request.method === 'GET' && getSyncMatch) {
       const code = getSyncMatch[1];
       if (code === undefined) {
-        return jsonResponse({ error: 'Not Found' }, 404, env);
+        return jsonResponse(request, { error: 'Not Found' }, 404, env);
       }
       try {
-        return await handleGetSync(code, env);
+        return await handleGetSync(request, code, env);
       } catch (err) {
         console.error(err);
-        return jsonResponse({ error: 'Internal Server Error' }, 500, env);
+        return jsonResponse(request, { error: 'Internal Server Error' }, 500, env);
       }
     }
 
-    return jsonResponse({ error: 'Not Found' }, 404, env);
+    return jsonResponse(request, { error: 'Not Found' }, 404, env);
   },
 } satisfies ExportedHandler<Env>;
