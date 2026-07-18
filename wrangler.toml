@@ -5,8 +5,7 @@ compatibility_date = "2026-07-18"
 [vars]
 ALLOWED_ORIGIN = "https://hub.yamanashi.dev"
 
-# `wrangler kv namespace create SYNC_KV` で作成した ID に置き換えてください。
 [[kv_namespaces]]
 binding = "SYNC_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"
+id = "0af76ff745a54e12ab0bc3e8f4c20275"
+preview_id = "4d52e592dca74999b4b8903bb268fec0"
