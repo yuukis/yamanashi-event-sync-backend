@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { corsHeaders, DEFAULT_ALLOWED_ORIGIN, getAllowedOrigins } from '../src/cors';
 import type { Env } from '../src/types';
 
@@ -27,6 +27,28 @@ describe('getAllowedOrigins', () => {
     expect(getAllowedOrigins(buildEnv({ ALLOWED_ORIGIN: '*' }))).toEqual([DEFAULT_ALLOWED_ORIGIN]);
   });
 
+  it('カンマ区切りの複数オリジンが設定されている場合はデフォルトにフォールバックする', () => {
+    expect(
+      getAllowedOrigins(buildEnv({ ALLOWED_ORIGIN: 'https://a.example.com,https://b.example.com' }))
+    ).toEqual([DEFAULT_ALLOWED_ORIGIN]);
+  });
+
+  it('空白区切りの複数オリジンが設定されている場合はデフォルトにフォールバックする', () => {
+    expect(
+      getAllowedOrigins(buildEnv({ ALLOWED_ORIGIN: 'https://a.example.com https://b.example.com' }))
+    ).toEqual([DEFAULT_ALLOWED_ORIGIN]);
+  });
+
+  it('パスを含む値が設定されている場合はデフォルトにフォールバックする', () => {
+    expect(getAllowedOrigins(buildEnv({ ALLOWED_ORIGIN: 'https://example.com/path' }))).toEqual([
+      DEFAULT_ALLOWED_ORIGIN,
+    ]);
+  });
+
+  it('不正なURLが設定されている場合はデフォルトにフォールバックする', () => {
+    expect(getAllowedOrigins(buildEnv({ ALLOWED_ORIGIN: 'not-a-url' }))).toEqual([DEFAULT_ALLOWED_ORIGIN]);
+  });
+
   it('有効なEXTRA_ALLOWED_ORIGINが設定されている場合は2件目として追加する', () => {
     expect(
       getAllowedOrigins(
@@ -39,6 +61,20 @@ describe('getAllowedOrigins', () => {
     expect(
       getAllowedOrigins(buildEnv({ ALLOWED_ORIGIN: 'https://hub.yamanashi.dev', EXTRA_ALLOWED_ORIGIN: '*' }))
     ).toEqual(['https://hub.yamanashi.dev']);
+  });
+
+  it('不正なEXTRA_ALLOWED_ORIGINの警告ログに生の値を出力しない', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    getAllowedOrigins(
+      buildEnv({ ALLOWED_ORIGIN: 'https://hub.yamanashi.dev', EXTRA_ALLOWED_ORIGIN: 'https://secret-host.example.com/path' })
+    );
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [message] = warnSpy.mock.calls[0] as [string];
+    expect(message).not.toContain('secret-host.example.com');
+
+    warnSpy.mockRestore();
   });
 
   it('EXTRA_ALLOWED_ORIGINがALLOWED_ORIGINと同じ場合は重複させない', () => {
